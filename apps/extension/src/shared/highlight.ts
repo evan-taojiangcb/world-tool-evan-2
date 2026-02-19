@@ -34,7 +34,7 @@ export function clearHighlights(root: ParentNode = document): void {
   });
 }
 
-export function highlightWords(words: string[], onClick: (word: string, rect: DOMRect) => void): void {
+export function highlightWords(words: string[]): void {
   if (!words.length) return;
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   const nodes: Text[] = [];
@@ -83,11 +83,6 @@ export function highlightWords(words: string[], onClick: (word: string, rect: DO
       mark.setAttribute(MARK_ATTR, "1");
       mark.dataset.word = m.word.toLowerCase();
       mark.className = "word-tool-highlight";
-      mark.addEventListener("click", (event) => {
-        event.stopPropagation();
-        const rect = mark.getBoundingClientRect();
-        onClick(mark.dataset.word || m.word.toLowerCase(), rect);
-      });
       fragment.append(mark);
       cursor = m.end;
     });

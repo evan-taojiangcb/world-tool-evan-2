@@ -2,11 +2,16 @@ export type DefinitionItem = {
   partOfSpeech: string;
   definition: string;
   example?: string;
+  exampleTranslation?: string;
   translation?: string;
 };
 
 export type WordData = {
   word: string;
+  translationZh?: string;
+  contextSentence?: string;
+  contextSentenceZh?: string;
+  contextExplanationZh?: string;
   phonetic: {
     uk?: string;
     us?: string;
@@ -16,6 +21,7 @@ export type WordData = {
     us?: string;
   };
   definitions: DefinitionItem[];
+  morphology?: string[];
   collectedAt?: number;
 };
 

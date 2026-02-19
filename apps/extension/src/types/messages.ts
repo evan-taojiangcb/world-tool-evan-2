@@ -1,7 +1,7 @@
 import type { WordData } from "@shared/index";
 
 export type RuntimeMessage =
-  | { type: "LOOKUP_WORD"; payload: { text: string } }
+  | { type: "LOOKUP_WORD"; payload: { text: string; contextSentence?: string } }
   | { type: "GET_COLLECTIONS" }
   | { type: "UPSERT_COLLECTION"; payload: { data: WordData } }
   | { type: "DELETE_COLLECTION"; payload: { word: string } }
