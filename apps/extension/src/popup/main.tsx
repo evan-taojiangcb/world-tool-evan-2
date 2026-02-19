@@ -17,7 +17,7 @@ function PopupApp(): JSX.Element {
 
   return (
     <div style={{ width: 320, padding: 12, fontFamily: "-apple-system, Segoe UI, sans-serif" }}>
-      <h3 style={{ marginTop: 0 }}>Word Tool Evan</h3>
+      <h3 style={{ marginTop: 0 }}>WordGlow</h3>
       <label style={{ display: "block", marginBottom: 6 }}>用户名</label>
       <input
         value={draft}

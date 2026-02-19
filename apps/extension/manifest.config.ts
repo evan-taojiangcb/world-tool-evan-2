@@ -2,11 +2,11 @@ import type { ManifestV3Export } from "@crxjs/vite-plugin";
 
 const manifest: ManifestV3Export = {
   manifest_version: 3,
-  name: "Word Tool Evan",
+  name: "WordGlow",
   version: "0.1.0",
-  description: "Highlight and collect words/phrases while browsing.",
+  description: "Highlight, learn, and review words/phrases while browsing.",
   action: {
-    default_title: "Word Tool Evan",
+    default_title: "WordGlow",
     default_popup: "src/popup/index.html"
   },
   options_page: "src/options/index.html",

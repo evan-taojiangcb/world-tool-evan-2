@@ -1,4 +1,4 @@
-# Word Tool Evan 2
+# WordGlow
 
 一个为英语阅读场景设计的 Chrome 插件。  
 在网页中划词/双击即可查词，支持收藏高亮复习、短语回退解析、发音、中文释义与上下文解释。
@@ -6,7 +6,7 @@
 ## Why This Tool
 
 大多数词典工具只能“查一次”，不能把学习过程沉淀在阅读里。  
-Word Tool Evan 2 的核心目标是：
+WordGlow 的核心目标是：
 
 - 查询快：划词结束即可触发，无需离开当前网页
 - 记得住：收藏词条后，后续浏览自动高亮复习
@@ -34,7 +34,7 @@ Word Tool Evan 2 的核心目标是：
 
 ## Demo
 
-![Word Tool Demo](./assets/demo-1.gif)
+![WordGlow Demo](./assets/demo-1.gif)
 
 1. 划词 -> 出现悬浮按钮 -> 打开弹窗
 2. 收藏词条 -> 页面同词高亮
@@ -55,6 +55,7 @@ Word Tool Evan 2 的核心目标是：
 - `apps/api`: 词典与收藏同步 API
 - `packages/shared`: 共享类型定义
 - `docs`: PRD 与架构文档
+  - `docs/TECH_DESIGN.md`: 技术设计文档（实现细节、关键流程、测试与部署）
 
 ## Quick Start
 
