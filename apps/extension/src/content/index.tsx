@@ -347,7 +347,14 @@ function render(): void {
               <div className="word-tool-title" onMouseDown={startDrag}>
                 <div>
                   <div className="word-tool-word">{state.wordData.word}</div>
-                  <div className="word-tool-ipa">/{state.wordData.phonetic.uk || state.wordData.phonetic.us || "-"}/</div>
+                  <div className="word-tool-ipa-list">
+                    <div className="word-tool-ipa">
+                      <span className="word-tool-ipa-label">UK</span> /{state.wordData.phonetic.uk || "-"}/
+                    </div>
+                    <div className="word-tool-ipa">
+                      <span className="word-tool-ipa-label">US</span> /{state.wordData.phonetic.us || "-"}/
+                    </div>
+                  </div>
                 </div>
                 <div className="word-tool-actions">
                   <button
@@ -384,10 +391,10 @@ function render(): void {
 
               <div className="word-tool-phonetic-row">
                 <button className="word-tool-audio-chip" onClick={() => playAudio(state.wordData?.audio.uk)}>
-                  <strong>UK</strong> <Icon name="volume" />
+                  <strong>UK</strong> [{state.wordData.phonetic.uk || "-"}] <Icon name="volume" />
                 </button>
                 <button className="word-tool-audio-chip" onClick={() => playAudio(state.wordData?.audio.us)}>
-                  <strong>US</strong> <Icon name="volume" />
+                  <strong>US</strong> [{state.wordData.phonetic.us || "-"}] <Icon name="volume" />
                 </button>
               </div>
 
