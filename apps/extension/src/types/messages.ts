@@ -1,4 +1,5 @@
 import type { WordData } from "@shared/index";
+import type { PronunciationSettings } from "../shared/settings";
 
 export type RuntimeMessage =
   | { type: "LOOKUP_WORD"; payload: { text: string; contextSentence?: string } }
@@ -9,6 +10,8 @@ export type RuntimeMessage =
   | { type: "GET_REVIEW_QUEUE" }
   | { type: "DELETE_REVIEW_QUEUE"; payload: { word: string } }
   | { type: "CLEAR_REVIEW_QUEUE" }
+  | { type: "GET_SETTINGS" }
+  | { type: "SET_SETTINGS"; payload: { settings: Partial<PronunciationSettings> } }
   | { type: "GET_USERNAME" }
   | { type: "SET_USERNAME"; payload: { username: string } };
 

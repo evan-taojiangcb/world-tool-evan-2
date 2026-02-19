@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { isEventInsideExtensionRoot, shouldIgnoreSelectionSample } from "./event-guards";
+import {
+  getFloatingButtonRevealDelay,
+  isEventInsideExtensionRoot,
+  shouldIgnoreSelectionSample,
+  shouldPreserveSelectionClick,
+  shouldShowFloatingButton
+} from "./event-guards";
 
 function createHost(insideNodes: unknown[] = []): EventTarget & { contains: (node: Node | null) => boolean } {
   const host = new EventTarget() as EventTarget & { contains: (node: Node | null) => boolean };
@@ -51,5 +57,21 @@ describe("event guards", () => {
     const activeElement = { id: "audio-btn" } as unknown as Element;
     const host = createHost([activeElement]);
     expect(shouldIgnoreSelectionSample(2200, 2100, activeElement, host)).toBe(true);
+  });
+
+  it("preserves first page click shortly after drag selection", () => {
+    expect(shouldPreserveSelectionClick(1000, 1200, false)).toBe(true);
+    expect(shouldPreserveSelectionClick(1300, 1200, false)).toBe(false);
+    expect(shouldPreserveSelectionClick(1000, 1200, true)).toBe(false);
+  });
+
+  it("delays floating button reveal only for drag selection", () => {
+    expect(getFloatingButtonRevealDelay("drag")).toBeGreaterThan(0);
+    expect(getFloatingButtonRevealDelay("dblclick")).toBe(0);
+  });
+
+  it("reveals floating button when reveal timestamp is reached", () => {
+    expect(shouldShowFloatingButton(1000, 1001)).toBe(false);
+    expect(shouldShowFloatingButton(1001, 1001)).toBe(true);
   });
 });

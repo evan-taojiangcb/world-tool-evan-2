@@ -2,9 +2,16 @@ import { createRoot } from "react-dom/client";
 import type { WordData } from "@shared/index";
 import { clearHighlights, highlightWords } from "../shared/highlight";
 import { sendRuntimeMessage } from "../shared/api";
-import { MARK_ATTR } from "../shared/constants";
+import { MARK_ATTR, STORAGE_KEYS } from "../shared/constants";
+import { DEFAULT_SETTINGS, type PronunciationSettings } from "../shared/settings";
 import { isValidLookupText, normalizeSelectedText } from "../shared/text";
-import { isEventInsideExtensionRoot, shouldIgnoreSelectionSample } from "./event-guards";
+import {
+  getFloatingButtonRevealDelay,
+  isEventInsideExtensionRoot,
+  shouldIgnoreSelectionSample,
+  shouldPreserveSelectionClick,
+  shouldShowFloatingButton
+} from "./event-guards";
 
 // 选区锚点：记录被查询文本及其在页面中的位置。
 type SelectionAnchor = {
@@ -35,6 +42,7 @@ type PopoverPosition = {
  */
 type UIState = {
   anchor: SelectionAnchor | null;
+  selectedRange: Range | null;
   query: string;
   wordData: WordData | null;
   loading: boolean;
@@ -44,11 +52,14 @@ type UIState = {
   popoverPosition: PopoverPosition | null;
   menuOpen: boolean;
   flashText: string | null;
+  floatingButtonRevealAt: number;
+  settings: PronunciationSettings;
 };
 
 // 运行时状态容器（不使用 React 状态，统一通过 render() 刷新）。
 const state: UIState = {
   anchor: null,
+  selectedRange: null,
   query: "",
   wordData: null,
   loading: false,
@@ -57,7 +68,9 @@ const state: UIState = {
   collections: {},
   popoverPosition: null,
   menuOpen: false,
-  flashText: null
+  flashText: null,
+  floatingButtonRevealAt: 0,
+  settings: DEFAULT_SETTINGS
 };
 
 const host = document.createElement("div");
@@ -68,23 +81,44 @@ const root = createRoot(host);
 // 拖拽与事件节流相关的临时变量。
 let dragOrigin: { x: number; y: number } | null = null;
 let dragStartPos: PopoverPosition | null = null;
-let selectionTimer: number | null = null;
 let isApplyingHighlights = false;
 let suppressObserverUntil = 0;
 let suppressSelectionUntil = 0;
+let isMouseSelecting = false;
+let suppressNextSelectionClickUntil = 0;
+let floatingButtonTimer: number | null = null;
 
 // 启动入口：加载收藏词、首次渲染并绑定事件监听。
 async function boot(): Promise<void> {
   state.collections = await sendRuntimeMessage<Record<string, WordData>>({ type: "GET_COLLECTIONS" });
+  state.settings = await sendRuntimeMessage<PronunciationSettings>({ type: "GET_SETTINGS" });
   render();
   refreshHighlights();
   bindSelectionEvents();
   bindGlobalCloseEvents();
   observeDomChanges();
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== "local") return;
+    if (!changes[STORAGE_KEYS.SETTINGS]?.newValue) return;
+    state.settings = {
+      ...DEFAULT_SETTINGS,
+      ...(changes[STORAGE_KEYS.SETTINGS].newValue as Partial<PronunciationSettings>)
+    };
+    render();
+  });
 }
 
 // 绑定选词相关事件：mouseup/dblclick/selectionchange，以及点击高亮词回查。
 function bindSelectionEvents(): void {
+  document.addEventListener(
+    "mousedown",
+    (event) => {
+      if (event.button !== 0) return;
+      if (isEventInsideExtensionRoot(event, host)) return;
+      isMouseSelecting = true;
+    },
+    true
+  );
   document.addEventListener(
     "pointerdown",
     (event) => {
@@ -94,22 +128,39 @@ function bindSelectionEvents(): void {
     },
     true
   );
-  document.addEventListener("mouseup", () => {
-    window.setTimeout(onTextSelection, 0);
-  });
+  document.addEventListener(
+    "mouseup",
+    (event) => {
+      if (event.button !== 0) return;
+      const shouldCheckSelection = isMouseSelecting;
+      isMouseSelecting = false;
+      const selection = window.getSelection();
+      const hasSelection = Boolean(selection && !selection.isCollapsed && normalizeSelectedText(selection.toString()));
+      if (!shouldCheckSelection) return;
+      if (hasSelection) {
+        suppressNextSelectionClickUntil = Date.now() + 520;
+      }
+      window.setTimeout(() => onTextSelection("drag"), 0);
+    },
+    true
+  );
   document.addEventListener("dblclick", () => {
-    window.setTimeout(onTextSelection, 0);
+    window.setTimeout(() => onTextSelection("dblclick"), 0);
   });
-  document.addEventListener("selectionchange", () => {
-    if (selectionTimer) window.clearTimeout(selectionTimer);
-    selectionTimer = window.setTimeout(() => {
-      selectionTimer = null;
-      onTextSelection();
-    }, 80);
+  document.addEventListener("dragend", () => {
+    isMouseSelecting = false;
   });
   document.addEventListener(
     "click",
     (event) => {
+      const insideExtension = isEventInsideExtensionRoot(event, host);
+      if (shouldPreserveSelectionClick(Date.now(), suppressNextSelectionClickUntil, insideExtension)) {
+        event.preventDefault();
+        event.stopPropagation();
+        suppressNextSelectionClickUntil = 0;
+        restoreSelectionIfLost();
+        return;
+      }
       const target = event.target as Element | null;
       const mark = target?.closest<HTMLElement>(`[${MARK_ATTR}]`);
       if (!mark) return;
@@ -124,6 +175,7 @@ function bindSelectionEvents(): void {
         rect: mark.getBoundingClientRect(),
         contextSentence: extractSentenceFromText(mark.parentElement?.textContent, word)
       };
+      state.selectedRange = null;
       state.query = state.anchor.text;
       state.visible = true;
       state.popoverPosition = null;
@@ -136,13 +188,14 @@ function bindSelectionEvents(): void {
 // 绑定“点击外部关闭”逻辑，避免与扩展浮层内部点击冲突。
 function bindGlobalCloseEvents(): void {
   document.addEventListener("click", (event) => {
+    if (Date.now() < suppressNextSelectionClickUntil) return;
     if (isEventInsideExtensionRoot(event, host)) return;
     hideFloating();
   });
 }
 
 // 从当前选区提取文本并更新 UI 状态；仅准备查询，不立即发请求。
-function onTextSelection(): void {
+function onTextSelection(trigger: "drag" | "dblclick"): void {
   if (shouldIgnoreSelectionSample(Date.now(), suppressSelectionUntil, document.activeElement, host)) return;
   const active = document.activeElement;
   if (active && ["INPUT", "TEXTAREA"].includes(active.tagName)) return;
@@ -152,11 +205,13 @@ function onTextSelection(): void {
     return;
   }
   const rect = selection.getRangeAt(0).getBoundingClientRect();
+  const range = selection.getRangeAt(0).cloneRange();
   state.anchor = {
     text,
     rect,
-    contextSentence: extractSentenceFromRange(selection.getRangeAt(0), text)
+    contextSentence: extractSentenceFromRange(range, text)
   };
+  state.selectedRange = range;
   state.query = text;
   state.visible = true;
   state.wordData = null;
@@ -164,19 +219,58 @@ function onTextSelection(): void {
   state.menuOpen = false;
   state.flashText = null;
   state.favorited = Boolean(state.collections[text.toLowerCase()]);
+  scheduleFloatingButtonReveal(getFloatingButtonRevealDelay(trigger));
   render();
+  restoreSelectionIfLost();
 }
 
 // 关闭浮层并清理本次查询相关状态。
 function hideFloating(): void {
   state.visible = false;
   state.anchor = null;
+  state.selectedRange = null;
   state.wordData = null;
   state.loading = false;
   state.popoverPosition = null;
   state.menuOpen = false;
   state.flashText = null;
+  state.floatingButtonRevealAt = 0;
+  if (floatingButtonTimer) {
+    window.clearTimeout(floatingButtonTimer);
+    floatingButtonTimer = null;
+  }
   render();
+}
+
+function scheduleFloatingButtonReveal(delayMs: number): void {
+  state.floatingButtonRevealAt = Date.now() + Math.max(0, delayMs);
+  if (floatingButtonTimer) {
+    window.clearTimeout(floatingButtonTimer);
+    floatingButtonTimer = null;
+  }
+  if (delayMs > 0) {
+    floatingButtonTimer = window.setTimeout(() => {
+      floatingButtonTimer = null;
+      render();
+    }, delayMs);
+  }
+}
+
+function restoreSelectionIfLost(): void {
+  const cached = state.selectedRange;
+  if (!cached) return;
+  window.setTimeout(() => {
+    if (!state.visible || !state.selectedRange) return;
+    const sel = window.getSelection();
+    if (!sel) return;
+    if (!sel.isCollapsed) return;
+    try {
+      sel.removeAllRanges();
+      sel.addRange(state.selectedRange);
+    } catch {
+      // ignore invalidated range
+    }
+  }, 0);
 }
 
 // 根据 state.query 执行查词，失败时提供兜底定义。
@@ -504,6 +598,17 @@ function getPrimaryDefinition(wordData: WordData): { pos: string; translation?: 
   };
 }
 
+function getMorphPhoneticDisplay(
+  wordData: WordData,
+  part: string,
+  settings: PronunciationSettings
+): string | null {
+  const item = wordData.morphologyPhonetics?.[part];
+  if (!item) return null;
+  const selected = settings.morphologyAccent === "us" ? item.us : item.uk;
+  return selected ? `/${formatPhonetic(selected)}/` : null;
+}
+
 function getContextExplanation(wordData: WordData): string {
   const sentence = wordData.contextSentence ? `原句：${wordData.contextSentence}` : "";
   const explain = wordData.contextExplanationZh || wordData.definitions[0]?.translation || `暂无 ${wordData.word} 的上下文解释说明。`;
@@ -609,17 +714,26 @@ function render(): void {
   const btnLeft = Math.min(window.innerWidth - 44, Math.max(8, anchor.rect.right + 6));
   const btnTop = Math.min(window.innerHeight - 44, Math.max(8, anchor.rect.top - 8));
   const popover = state.popoverPosition ?? getDefaultPopoverPosition(anchor);
+  const isPhraseLookup = /\s/.test((state.query || state.wordData?.word || "").trim());
+  const showFloatingButton = shouldShowFloatingButton(Date.now(), state.floatingButtonRevealAt);
 
   root.render(
     <>
-      <button
-        className="word-tool-floating-btn"
-        style={{ left: `${btnLeft}px`, top: `${btnTop}px` }}
-        onClick={() => void lookupCurrent()}
-        title="查询"
-      >
-        <Icon name="search" />
-      </button>
+      {showFloatingButton ? (
+        <button
+          className="word-tool-floating-btn"
+          style={{ left: `${btnLeft}px`, top: `${btnTop}px` }}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={(event) => {
+            event.preventDefault();
+            void lookupCurrent();
+          }}
+          tabIndex={-1}
+          title="查询"
+        >
+          <Icon name="search" />
+        </button>
+      ) : null}
 
       {(state.loading || state.wordData) && (
         <div className="word-tool-popover" style={{ top: `${popover.top}px`, left: `${popover.left}px` }}>
@@ -685,36 +799,59 @@ function render(): void {
               )}
 
               <div className="word-tool-phonetic-row">
-                <div className="word-tool-audio-row">
-                  <div className="word-tool-audio-text">
-                    <strong>UK</strong>
-                    <span>{formatPhonetic(state.wordData.phonetic.uk)}</span>
+                {isPhraseLookup ? (
+                  <div className="word-tool-audio-row">
+                    <div className="word-tool-audio-text">
+                      <strong>短语</strong>
+                      <span>{state.wordData.word}</span>
+                    </div>
+                    <button
+                      className="word-tool-audio-chip"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        playAudio(undefined, state.wordData!.word, "us");
+                      }}
+                    >
+                      <Icon name="volume" />
+                    </button>
                   </div>
-                  <button
-                    className="word-tool-audio-chip"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      playAudio(state.wordData?.audio.uk, state.wordData!.word, "uk");
-                    }}
-                  >
-                    <Icon name="volume" />
-                  </button>
-                </div>
-                <div className="word-tool-audio-row">
-                  <div className="word-tool-audio-text">
-                    <strong>US</strong>
-                    <span>{formatPhonetic(state.wordData.phonetic.us)}</span>
-                  </div>
-                  <button
-                    className="word-tool-audio-chip"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      playAudio(state.wordData?.audio.us, state.wordData!.word, "us");
-                    }}
-                  >
-                    <Icon name="volume" />
-                  </button>
-                </div>
+                ) : (
+                  <>
+                    <div className="word-tool-audio-row">
+                      <div className="word-tool-audio-text">
+                        <strong>UK</strong>
+                        <span>{formatPhonetic(state.wordData.phonetic.uk)}</span>
+                      </div>
+                      <button
+                        className="word-tool-audio-chip"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          playAudio(state.wordData?.audio.uk, state.wordData!.word, "uk");
+                        }}
+                      >
+                        <Icon name="volume" />
+                      </button>
+                    </div>
+                    <div className="word-tool-audio-row">
+                      <div className="word-tool-audio-text">
+                        <strong>US</strong>
+                        <span>{formatPhonetic(state.wordData.phonetic.us)}</span>
+                      </div>
+                      <button
+                        className="word-tool-audio-chip"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          playAudio(state.wordData?.audio.us, state.wordData!.word, "us");
+                        }}
+                      >
+                        <Icon name="volume" />
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
 
               {(() => {
@@ -729,7 +866,54 @@ function render(): void {
                 );
               })()}
 
-              {(() => {
+              {!isPhraseLookup && (
+                <div className="word-tool-morph-setting">
+                  <span className="word-tool-pos">词根音标</span>
+                  <span className="word-tool-radio-group">
+                    <label className={`word-tool-radio ${state.settings.morphologyAccent === "uk" ? "active" : ""}`}>
+                      <input
+                        type="radio"
+                        name="morph-accent-inline"
+                        checked={state.settings.morphologyAccent === "uk"}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onChange={() => {
+                          void sendRuntimeMessage<PronunciationSettings>({
+                            type: "SET_SETTINGS",
+                            payload: { settings: { morphologyAccent: "uk" } }
+                          }).then((next) => {
+                            state.settings = next;
+                            render();
+                          });
+                        }}
+                      />
+                      <span className="word-tool-radio-dot" />
+                      <span>UK</span>
+                    </label>
+                    <label className={`word-tool-radio ${state.settings.morphologyAccent === "us" ? "active" : ""}`}>
+                      <input
+                        type="radio"
+                        name="morph-accent-inline"
+                        checked={state.settings.morphologyAccent === "us"}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onChange={() => {
+                          void sendRuntimeMessage<PronunciationSettings>({
+                            type: "SET_SETTINGS",
+                            payload: { settings: { morphologyAccent: "us" } }
+                          }).then((next) => {
+                            state.settings = next;
+                            render();
+                          });
+                        }}
+                      />
+                      <span className="word-tool-radio-dot" />
+                      <span>US</span>
+                    </label>
+                  </span>
+                </div>
+              )}
+
+              {!isPhraseLookup &&
+                (() => {
                 const morphParts = state.wordData.morphology ?? [];
                 if (!morphParts.length) return null;
                 return (
@@ -738,14 +922,20 @@ function render(): void {
                     <span className="word-tool-morph-parts">
                       {morphParts.map((part, idx) => (
                         <span key={`${part}-${idx}`} className="word-tool-morph-token">
-                          <span className="word-tool-morph-chip">{part}</span>
+                          <span className="word-tool-morph-chip-wrap">
+                            <span className="word-tool-morph-chip">{part}</span>
+                            {(() => {
+                              const phonetic = getMorphPhoneticDisplay(state.wordData!, part, state.settings);
+                              return phonetic ? <span className="word-tool-morph-phonetic">{phonetic}</span> : null;
+                            })()}
+                          </span>
                           {idx < morphParts.length - 1 ? <span className="word-tool-morph-plus">+</span> : null}
                         </span>
                       ))}
                     </span>
                   </div>
                 );
-              })()}
+                })()}
 
               {(() => {
                 const primary = getPrimaryDefinition(state.wordData);

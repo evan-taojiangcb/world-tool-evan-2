@@ -22,6 +22,7 @@ export type WordData = {
   };
   definitions: DefinitionItem[];
   morphology?: string[];
+  morphologyPhonetics?: Record<string, { uk?: string; us?: string }>;
   collectedAt?: number;
 };
 

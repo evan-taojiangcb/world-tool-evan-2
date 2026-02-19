@@ -1,5 +1,6 @@
 import type { CollectionSyncPayload, WordData } from "@shared/index";
 import { STORAGE_KEYS } from "../shared/constants";
+import { DEFAULT_SETTINGS, normalizeSettings, type PronunciationSettings } from "../shared/settings";
 import type { RuntimeMessage, RuntimeResponse } from "../types/messages";
 import {
   LOOKUP_CACHE_KEY,
@@ -11,6 +12,8 @@ import {
 const API_BASE = import.meta.env.VITE_WORD_TOOL_API_BASE ?? "http://localhost:3000";
 const REVIEW_QUEUE_KEY = "review_queue";
 const sentenceZhCache = new Map<string, string>();
+const morphologyPronCache = new Map<string, string>();
+const STOP_WORDS = new Set(["a", "an", "the", "to", "of", "in", "on", "for", "at", "and", "or", "with"]);
 const COMMON_PREFIXES = ["anti", "inter", "trans", "super", "under", "over", "pre", "post", "re", "un", "dis", "im", "in"];
 const COMMON_SUFFIXES = ["ization", "ation", "ment", "ness", "less", "able", "ible", "tion", "sion", "ity", "ism", "ist", "ous", "ive", "al", "er", "or", "ly", "ed", "ing", "es", "s"];
 
@@ -31,13 +34,27 @@ function deriveMorphology(word: string): string[] {
   return parts.length ? parts : [clean];
 }
 
+function extractPhraseCandidates(phrase: string): string[] {
+  const tokens = phrase
+    .split(/[\s\-_/]+/)
+    .map((t) => t.trim().toLowerCase())
+    .filter((t) => /^[a-z]+$/.test(t) && t.length > 2 && !STOP_WORDS.has(t));
+  return [...new Set(tokens)].sort((a, b) => b.length - a.length);
+}
+
 async function fetchDatamusePronunciation(word: string): Promise<string | undefined> {
+  const key = word.trim().toLowerCase();
+  if (!key) return undefined;
+  const cached = morphologyPronCache.get(key);
+  if (cached) return cached;
   try {
-    const response = await fetch(`https://api.datamuse.com/words?sp=${encodeURIComponent(word)}&md=r&max=1`);
+    const response = await fetch(`https://api.datamuse.com/words?sp=${encodeURIComponent(key)}&md=r&max=1`);
     if (!response.ok) return undefined;
     const data = (await response.json()) as Array<{ tags?: string[] }>;
     const tag = data[0]?.tags?.find((t) => t.startsWith("pron:"));
-    return tag ? tag.replace("pron:", "") : undefined;
+    const pron = tag ? tag.replace("pron:", "") : undefined;
+    if (pron) morphologyPronCache.set(key, pron);
+    return pron;
   } catch {
     return undefined;
   }
@@ -143,6 +160,10 @@ async function handleMessage(message: RuntimeMessage): Promise<unknown> {
       return deleteReviewQueue(message.payload.word);
     case "CLEAR_REVIEW_QUEUE":
       return clearReviewQueue();
+    case "GET_SETTINGS":
+      return getSettings();
+    case "SET_SETTINGS":
+      return setSettings(message.payload.settings);
     default:
       return null;
   }
@@ -153,7 +174,7 @@ async function lookupWord(text: string, contextSentence?: string): Promise<WordD
   if (!queryKey) throw new Error("Lookup failed");
   const cached = await getCachedWord(queryKey);
   if (cached) {
-    const enrichedCached = await ensureZhTranslation(cached, queryKey);
+    const enrichedCached = await ensureMorphologyPhonetics(await ensureZhTranslation(cached, queryKey));
     const withContext = await applyContextInfo(enrichedCached, contextSentence, { translateSentence: true });
     if (withContext !== cached) {
       await setCachedWord(queryKey, withContext);
@@ -169,7 +190,7 @@ async function lookupWord(text: string, contextSentence?: string): Promise<WordD
     });
     if (response.ok) {
       const data = (await response.json()) as WordData;
-      const enriched = await ensureZhTranslation(data, queryKey);
+      const enriched = await ensureMorphologyPhonetics(await ensureZhTranslation(data, queryKey));
       const withContext = await applyContextInfo(enriched, contextSentence, { translateSentence: true });
       await setCachedWord(queryKey, withContext);
       return withContext;
@@ -178,9 +199,41 @@ async function lookupWord(text: string, contextSentence?: string): Promise<WordD
     // Fall through to public dictionary API.
   }
 
-  const fallback = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(queryKey)}`);
-  if (!fallback.ok) throw new Error("Lookup failed");
-  const payload = (await fallback.json()) as Array<{
+  const payload = await fetchDictionaryPayload(queryKey);
+  if (!payload) {
+    if (/\s/.test(queryKey)) {
+      const phraseResult = await resolvePhraseFallback(queryKey);
+      const enrichedPhrase = await ensureMorphologyPhonetics(await ensureZhTranslation(phraseResult, queryKey));
+      const withContext = await applyContextInfo(enrichedPhrase, contextSentence, { translateSentence: true });
+      await setCachedWord(queryKey, withContext);
+      return withContext;
+    }
+    throw new Error("Lookup failed");
+  }
+
+  const first = payload[0];
+  if (!first) throw new Error("Lookup failed");
+  const result = await mapDictionaryEntryToWordData(first, text, queryKey);
+  const withContext = await applyContextInfo(result, contextSentence, { translateSentence: true });
+  await setCachedWord(queryKey, withContext);
+  return withContext;
+}
+
+async function fetchDictionaryPayload(query: string): Promise<
+  | Array<{
+      word?: string;
+      phonetic?: string;
+      phonetics?: Array<{ text?: string; audio?: string }>;
+      meanings?: Array<{
+        partOfSpeech?: string;
+        definitions?: Array<{ definition?: string; example?: string }>;
+      }>;
+    }>
+  | null
+> {
+  const fallback = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(query)}`);
+  if (!fallback.ok) return null;
+  return (await fallback.json()) as Array<{
     word?: string;
     phonetic?: string;
     phonetics?: Array<{ text?: string; audio?: string }>;
@@ -189,8 +242,21 @@ async function lookupWord(text: string, contextSentence?: string): Promise<WordD
       definitions?: Array<{ definition?: string; example?: string }>;
     }>;
   }>;
-  const first = payload[0];
-  if (!first) throw new Error("Lookup failed");
+}
+
+async function mapDictionaryEntryToWordData(
+  first: {
+    word?: string;
+    phonetic?: string;
+    phonetics?: Array<{ text?: string; audio?: string }>;
+    meanings?: Array<{
+      partOfSpeech?: string;
+      definitions?: Array<{ definition?: string; example?: string }>;
+    }>;
+  },
+  text: string,
+  queryKey: string
+): Promise<WordData> {
   const phonetics = first.phonetics ?? [];
   const getPhonetic = (key: "uk" | "us"): string | undefined =>
     phonetics.find((p) => (p.text || "").toLowerCase().includes(key))?.text ??
@@ -222,6 +288,7 @@ async function lookupWord(text: string, contextSentence?: string): Promise<WordD
   const us = getPhonetic("us");
   const pronFallback = !uk && !us ? await fetchDatamusePronunciation(first.word || queryKey) : undefined;
 
+  const morphology = deriveMorphology(first.word || queryKey);
   const result: WordData = {
     word: first.word || text.trim().toLowerCase(),
     translationZh:
@@ -244,12 +311,55 @@ async function lookupWord(text: string, contextSentence?: string): Promise<WordD
             translation: "未查询到释义。"
           }
         ],
-    morphology: deriveMorphology(first.word || queryKey)
+    morphology,
+    morphologyPhonetics: await buildMorphologyPhonetics(morphology)
   };
+  return result;
+}
 
-  const withContext = await applyContextInfo(result, contextSentence, { translateSentence: true });
-  await setCachedWord(queryKey, withContext);
-  return withContext;
+async function resolvePhraseFallback(phrase: string): Promise<WordData> {
+  const candidates = extractPhraseCandidates(phrase);
+  for (const candidate of candidates) {
+    const payload = await fetchDictionaryPayload(candidate);
+    if (!payload?.length) continue;
+    const base = await mapDictionaryEntryToWordData(payload[0], candidate, candidate);
+    return {
+      ...base,
+      word: phrase,
+      translationZh: (await translateToZh(phrase)) ?? base.translationZh,
+      definitions: [
+        {
+          partOfSpeech: "phrase",
+          definition: `短语“${phrase}”未直接命中，当前展示关键词“${candidate}”的结果。`,
+          translation: `短语“${phrase}”暂无直查结果，已回退到关键词“${candidate}”。`,
+          example: base.definitions[0]?.example,
+          exampleTranslation: base.definitions[0]?.exampleTranslation
+        },
+        ...base.definitions
+      ],
+      morphology: base.morphology,
+      morphologyPhonetics: base.morphologyPhonetics
+    };
+  }
+  const morphology = phrase
+    .split(/\s+/)
+    .map((p) => p.trim().toLowerCase())
+    .filter(Boolean);
+  return {
+    word: phrase,
+    translationZh: (await translateToZh(phrase)) ?? `短语“${phrase}”暂无稳定翻译。`,
+    phonetic: {},
+    audio: {},
+    definitions: [
+      {
+        partOfSpeech: "phrase",
+        definition: `短语“${phrase}”查询失败，建议改查关键单词。`,
+        translation: `短语“${phrase}”暂未查到，可尝试拆分后查询。`
+      }
+    ],
+    morphology,
+    morphologyPhonetics: await buildMorphologyPhonetics(morphology)
+  };
 }
 
 async function ensureZhTranslation(data: WordData, fallbackWord: string): Promise<WordData> {
@@ -287,6 +397,14 @@ async function ensureZhTranslation(data: WordData, fallbackWord: string): Promis
     definitions,
     translationZh: translationZh ?? data.translationZh
   };
+}
+
+async function ensureMorphologyPhonetics(data: WordData): Promise<WordData> {
+  if (!data.morphology?.length) return data;
+  if (data.morphologyPhonetics && Object.keys(data.morphologyPhonetics).length) return data;
+  const morphologyPhonetics = await buildMorphologyPhonetics(data.morphology);
+  if (!morphologyPhonetics) return data;
+  return { ...data, morphologyPhonetics };
 }
 
 function normalizeSentence(input?: string): string | undefined {
@@ -415,6 +533,31 @@ async function setCachedWord(queryKey: string, data: WordData): Promise<void> {
 function stripContextFields(data: WordData): WordData {
   const { contextSentence: _c1, contextSentenceZh: _c2, contextExplanationZh: _c3, ...rest } = data;
   return rest;
+}
+
+async function buildMorphologyPhonetics(parts?: string[]): Promise<Record<string, { uk?: string; us?: string }> | undefined> {
+  if (!parts?.length) return undefined;
+  const entries = await Promise.all(
+    parts.map(async (part) => {
+      const pron = await fetchDatamusePronunciation(part);
+      if (!pron) return null;
+      return [part, { uk: pron, us: pron }] as const;
+    })
+  );
+  const map = Object.fromEntries(entries.filter(Boolean) as Array<readonly [string, { uk?: string; us?: string }]>);
+  return Object.keys(map).length ? map : undefined;
+}
+
+async function getSettings(): Promise<PronunciationSettings> {
+  const result = await chrome.storage.local.get(STORAGE_KEYS.SETTINGS);
+  return normalizeSettings(result[STORAGE_KEYS.SETTINGS]);
+}
+
+async function setSettings(settingsPatch: Partial<PronunciationSettings>): Promise<PronunciationSettings> {
+  const current = await getSettings();
+  const next = normalizeSettings({ ...current, ...settingsPatch });
+  await chrome.storage.local.set({ [STORAGE_KEYS.SETTINGS]: next });
+  return next;
 }
 
 async function syncCollections(username: string): Promise<void> {

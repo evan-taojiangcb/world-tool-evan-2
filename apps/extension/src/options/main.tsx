@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { WordData } from "@shared/index";
 import { sendRuntimeMessage } from "../shared/api";
+import { DEFAULT_SETTINGS, type PronunciationSettings } from "../shared/settings";
 
 type ReviewQueueItem = {
   word: string;
@@ -47,10 +48,12 @@ function OptionsApp(): JSX.Element {
   const [collections, setCollections] = useState<Record<string, WordData>>({});
   const [queue, setQueue] = useState<ReviewQueueItem[]>([]);
   const [activeTab, setActiveTab] = useState<"collections" | "queue">("collections");
+  const [settings, setSettings] = useState<PronunciationSettings>(DEFAULT_SETTINGS);
 
   useEffect(() => {
     void sendRuntimeMessage<Record<string, WordData>>({ type: "GET_COLLECTIONS" }).then(setCollections);
     void sendRuntimeMessage<ReviewQueueItem[]>({ type: "GET_REVIEW_QUEUE" }).then(setQueue);
+    void sendRuntimeMessage<PronunciationSettings>({ type: "GET_SETTINGS" }).then(setSettings);
   }, []);
 
   const words = useMemo(() => Object.values(collections), [collections]);
@@ -74,9 +77,38 @@ function OptionsApp(): JSX.Element {
     setQueue([]);
   };
 
+  const updateSettings = async (patch: Partial<PronunciationSettings>): Promise<void> => {
+    const next = await sendRuntimeMessage<PronunciationSettings>({
+      type: "SET_SETTINGS",
+      payload: { settings: patch }
+    });
+    setSettings(next);
+  };
+
   return (
     <div style={{ maxWidth: 840, margin: "30px auto", fontFamily: "-apple-system, Segoe UI, sans-serif" }}>
       <h2>收藏与复习管理</h2>
+      <div style={{ marginBottom: 16, padding: 12, border: "1px solid #e5e7eb", borderRadius: 8 }}>
+        <div style={{ fontWeight: 600, marginBottom: 8 }}>词根音标展示设置</div>
+        <label style={{ marginRight: 16 }}>
+          <input
+            type="radio"
+            name="morphology-accent"
+            checked={settings.morphologyAccent === "uk"}
+            onChange={() => void updateSettings({ morphologyAccent: "uk" })}
+          />{" "}
+          默认英音 (UK)
+        </label>
+        <label style={{ marginLeft: 16 }}>
+          <input
+            type="radio"
+            name="morphology-accent"
+            checked={settings.morphologyAccent === "us"}
+            onChange={() => void updateSettings({ morphologyAccent: "us" })}
+          />{" "}
+          默认美音 (US)
+        </label>
+      </div>
       <div style={{ marginBottom: 16, display: "flex", gap: 8 }}>
         <button
           onClick={() => setActiveTab("collections")}

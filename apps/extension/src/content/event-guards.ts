@@ -32,3 +32,15 @@ export function shouldIgnoreSelectionSample(now: number, suppressUntil: number, 
   if (now < suppressUntil) return true;
   return Boolean(activeElement && safeHostContains(host, activeElement));
 }
+
+export function shouldPreserveSelectionClick(now: number, suppressUntil: number, isInsideExtensionRoot: boolean): boolean {
+  return now < suppressUntil && !isInsideExtensionRoot;
+}
+
+export function getFloatingButtonRevealDelay(trigger: "drag" | "dblclick"): number {
+  return trigger === "drag" ? 140 : 0;
+}
+
+export function shouldShowFloatingButton(now: number, revealAt: number): boolean {
+  return now >= revealAt;
+}

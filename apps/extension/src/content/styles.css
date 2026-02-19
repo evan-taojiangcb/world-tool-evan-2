@@ -135,6 +135,66 @@
   margin-top: 2px;
 }
 
+.word-tool-morph-setting {
+  margin: 4px 0 10px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  column-gap: 10px;
+}
+
+.word-tool-morph-setting-label {
+  font-size: 10px;
+  color: #9cb3ca;
+  letter-spacing: 0.02em;
+}
+
+.word-tool-radio-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.word-tool-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: #b9c8dd;
+  cursor: pointer;
+  user-select: none;
+}
+
+.word-tool-radio input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.word-tool-radio-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid rgba(156, 179, 202, 0.8);
+  box-sizing: border-box;
+}
+
+.word-tool-radio.active {
+  border-color: rgba(96, 165, 250, 0.58);
+  background: rgba(59, 130, 246, 0.22);
+  color: #e5f3ff;
+}
+
+.word-tool-radio.active .word-tool-radio-dot {
+  border-color: #9fd2ff;
+  background: #9fd2ff;
+}
+
 .word-tool-ipa-label {
   display: inline-block;
   width: 24px;
@@ -250,12 +310,14 @@
 }
 
 .word-tool-morph {
-  margin: 2px 0 10px;
+  margin: 2px 0 12px;
   font-size: 12px;
   color: #b9c5d6;
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  column-gap: 10px;
+  row-gap: 6px;
 }
 
 .word-tool-morph-label {
@@ -264,9 +326,9 @@
 }
 
 .word-tool-morph-parts {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
@@ -274,6 +336,13 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
+}
+
+.word-tool-morph-chip-wrap {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
 }
 
 .word-tool-morph-chip {
@@ -286,6 +355,13 @@
   color: #bfeaff;
   font-weight: 600;
   line-height: 1.2;
+}
+
+.word-tool-morph-phonetic {
+  font-size: 10px;
+  color: #9bc7e2;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
 }
 
 .word-tool-morph-plus {
