@@ -3,6 +3,8 @@ node_modules
 build
 dist
 .next
+.serverless
+apps/api/.serverless
 playwright-report
 test-results
 .env
@@ -10,3 +12,4 @@ test-results
 .DS_Store
 coverage
 *.log
+yarn.lock

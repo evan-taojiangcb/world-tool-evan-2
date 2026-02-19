@@ -1,5 +1,5 @@
 service: word-tool-api
-frameworkVersion: '4'
+frameworkVersion: '>=3 <5'
 
 provider:
   name: aws
