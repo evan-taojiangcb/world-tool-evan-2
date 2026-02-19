@@ -1,0 +1,315 @@
+.word-tool-floating-btn {
+  position: fixed;
+  z-index: 2147483600;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: #135bec;
+  color: #ffffff;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(19, 91, 236, 0.45);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.16s ease, background-color 0.16s ease;
+  animation: word-tool-fab-bounce 1.6s ease-in-out infinite;
+}
+
+.word-tool-floating-btn:hover {
+  background: #0f4fd5;
+}
+
+.word-tool-floating-btn:active {
+  transform: scale(0.94);
+}
+
+@keyframes word-tool-fab-bounce {
+  0%,
+  70%,
+  100% {
+    transform: translateY(0);
+  }
+  82% {
+    transform: translateY(-4px);
+  }
+}
+
+.word-tool-popover {
+  position: fixed;
+  z-index: 2147483601;
+  width: 340px;
+  max-height: min(72vh, 560px);
+  overflow: auto;
+  border-radius: 16px;
+  color: #ffffff;
+  background: rgba(28, 31, 39, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  padding: 14px;
+  font-family: "Lexend", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+  animation: word-tool-fade-in 0.18s ease-out;
+  outline: 1px solid rgba(255, 255, 255, 0.05);
+  outline-offset: -1px;
+}
+
+.word-tool-loading {
+  color: #c9d3e6;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+}
+
+.word-tool-flash {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  border-radius: 999px;
+  background: rgba(17, 19, 24, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #d0d6e0;
+  font-size: 11px;
+  padding: 4px 8px;
+}
+
+@keyframes word-tool-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.word-tool-popover-arrow {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  width: 14px;
+  height: 14px;
+  transform: translateX(-50%) rotate(45deg);
+  background: rgba(28, 31, 39, 0.92);
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.word-tool-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 10px;
+  cursor: grab;
+  user-select: none;
+}
+
+.word-tool-title:active {
+  cursor: grabbing;
+}
+
+.word-tool-word {
+  font-size: 24px;
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  max-width: 210px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.word-tool-ipa {
+  font-size: 11px;
+  color: #9da6b9;
+  margin-top: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.word-tool-actions {
+  display: flex;
+  gap: 6px;
+  position: relative;
+}
+
+.word-tool-menu {
+  position: absolute;
+  top: 52px;
+  right: 12px;
+  min-width: 170px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(17, 19, 24, 0.96);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+  padding: 4px;
+  z-index: 5;
+}
+
+.word-tool-menu-item {
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: #e2e8f0;
+  font-size: 12px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.word-tool-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.word-tool-icon-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 0;
+  background: rgba(255, 255, 255, 0.06);
+  color: #9da6b9;
+  cursor: pointer;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.word-tool-icon-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.word-tool-icon-btn.word-tool-star-active {
+  color: #facc15;
+}
+
+.word-tool-phonetic-row {
+  display: flex;
+  gap: 10px;
+  margin: 8px 0 12px;
+}
+
+.word-tool-audio-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #282e39;
+  color: #d0d6e0;
+  font-size: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.word-tool-audio-chip:hover {
+  background: #323945;
+  transform: translateY(-1px);
+}
+
+.word-tool-def {
+  margin: 10px 0 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #e2e8f0;
+}
+
+.word-tool-pos {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(19, 91, 236, 0.35);
+  background: rgba(19, 91, 236, 0.2);
+  color: #60a5fa;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 1px 8px;
+  margin-right: 6px;
+  text-transform: lowercase;
+  transform: translateY(-1px);
+}
+
+.word-tool-example {
+  margin-top: 7px;
+  padding-left: 10px;
+  border-left: 2px solid #282e39;
+  color: #9da6b9;
+  font-style: italic;
+}
+
+.word-tool-translation {
+  color: #ffffff;
+  font-style: normal;
+  margin-top: 4px;
+}
+
+.word-tool-footer {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.word-tool-footer-note {
+  font-size: 11px;
+  color: #9da6b9;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.word-tool-add-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 0;
+  background: #135bec;
+  color: #ffffff;
+  cursor: pointer;
+  box-shadow: 0 0 20px -5px rgba(19, 91, 236, 0.5);
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.16s ease, background-color 0.16s ease;
+}
+
+.word-tool-add-btn:hover {
+  background: #0f4fd5;
+}
+
+.word-tool-add-btn:active {
+  transform: scale(0.94);
+}
+
+.word-tool-highlight {
+  background-color: rgba(250, 204, 21, 0.25);
+  border-bottom: 2px solid #facc15;
+  color: #fefce8;
+  border-radius: 2px;
+  padding: 0 2px;
+  cursor: pointer;
+}
+
+.word-tool-popover::-webkit-scrollbar {
+  width: 8px;
+}
+
+.word-tool-popover::-webkit-scrollbar-track {
+  background: #111318;
+  border-radius: 999px;
+}
+
+.word-tool-popover::-webkit-scrollbar-thumb {
+  background: #282e39;
+  border-radius: 999px;
+}

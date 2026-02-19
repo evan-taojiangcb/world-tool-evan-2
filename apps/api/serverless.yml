@@ -1,0 +1,46 @@
+service: word-tool-api
+frameworkVersion: '4'
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: us-east-1
+  stage: ${opt:stage, 'prod'}
+  environment:
+    USER_COLLECTIONS_TABLE: UserCollections
+    WORD_CACHE_TABLE: WordCache
+
+plugins:
+  - serverless-offline
+
+resources:
+  Resources:
+    UserCollectionsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: UserCollections
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: username
+            AttributeType: S
+          - AttributeName: word
+            AttributeType: S
+        KeySchema:
+          - AttributeName: username
+            KeyType: HASH
+          - AttributeName: word
+            KeyType: RANGE
+    WordCacheTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: WordCache
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: word
+            AttributeType: S
+        KeySchema:
+          - AttributeName: word
+            KeyType: HASH
+        TimeToLiveSpecification:
+          AttributeName: expireAt
+          Enabled: true

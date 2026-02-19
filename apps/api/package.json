@@ -1,0 +1,24 @@
+{
+  "name": "@word-tool/api",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.886.0",
+    "@aws-sdk/lib-dynamodb": "^3.886.0",
+    "next": "^15.5.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "25.3.0",
+    "serverless": "^4.18.2",
+    "serverless-esbuild": "^1.55.1",
+    "serverless-offline": "^14.4.0",
+    "typescript": "^5.9.2"
+  }
+}

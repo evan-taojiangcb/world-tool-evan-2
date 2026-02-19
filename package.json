@@ -1,0 +1,22 @@
+{
+  "name": "word-tool-evan-2",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:extension": "npm --workspace @word-tool/extension run dev",
+    "build:extension": "npm --workspace @word-tool/extension run build",
+    "dev:api": "npm --workspace @word-tool/api run dev",
+    "build:api": "npm --workspace @word-tool/api run build",
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "npm --workspace @word-tool/extension run test",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.2",
+    "typescript": "^5.9.2"
+  }
+}

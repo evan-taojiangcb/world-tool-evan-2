@@ -1,0 +1,23 @@
+{
+  "projectId": "8016649895208235419",
+  "screens": [
+    {
+      "id": "1a70572b72024901bb4dd6c06819ba53",
+      "title": "In-Page Word Definition Popover",
+      "screenshot": "assets/stitch/in-page-word-definition-popover.png",
+      "html": "assets/stitch/in-page-word-definition-popover.html"
+    },
+    {
+      "id": "4f08322f404f4c6e9119b50fb84f367a",
+      "title": "Extension Toolbar Popup Menu",
+      "screenshot": "assets/stitch/extension-toolbar-popup-menu.png",
+      "html": "assets/stitch/extension-toolbar-popup-menu.html"
+    },
+    {
+      "id": "5ab98d9dcafa441890dd7a0dcde343e0",
+      "title": "Word Collection Management Dashboard",
+      "screenshot": "assets/stitch/word-collection-management-dashboard.png",
+      "html": "assets/stitch/word-collection-management-dashboard.html"
+    }
+  ]
+}
