@@ -2,7 +2,14 @@ import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, DeleteCommand, GetCommand, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import type { CollectionItem } from "./types";
 
-const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({ region: process.env.AWS_REGION || "us-east-1" }));
+const ddb = DynamoDBDocumentClient.from(
+  new DynamoDBClient({ region: process.env.AWS_REGION || "ap-northeast-1" }),
+  {
+    marshallOptions: {
+      removeUndefinedValues: true
+    }
+  }
+);
 
 const USER_COLLECTIONS_TABLE = process.env.USER_COLLECTIONS_TABLE || "UserCollections";
 const WORD_CACHE_TABLE = process.env.WORD_CACHE_TABLE || "WordCache";

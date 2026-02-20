@@ -4,14 +4,54 @@ frameworkVersion: '>=3 <5'
 provider:
   name: aws
   runtime: nodejs20.x
-  region: us-east-1
+  region: ap-northeast-1
   stage: ${opt:stage, 'prod'}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:Query
+            - dynamodb:DeleteItem
+          Resource:
+            - arn:aws:dynamodb:${aws:region}:${aws:accountId}:table/${self:provider.environment.USER_COLLECTIONS_TABLE}
+            - arn:aws:dynamodb:${aws:region}:${aws:accountId}:table/${self:provider.environment.WORD_CACHE_TABLE}
   environment:
     USER_COLLECTIONS_TABLE: UserCollections
     WORD_CACHE_TABLE: WordCache
 
 plugins:
+  - serverless-esbuild
   - serverless-offline
+
+custom:
+  esbuild:
+    bundle: true
+    minify: true
+    sourcemap: false
+    target: node20
+    platform: node
+    concurrency: 10
+
+functions:
+  api:
+    handler: lambda.handler
+    timeout: 25
+    events:
+      - httpApi:
+          method: GET
+          path: /api/word
+      - httpApi:
+          method: GET
+          path: /api/collections
+      - httpApi:
+          method: POST
+          path: /api/collections
+      - httpApi:
+          method: DELETE
+          path: /api/collections/{word}
 
 resources:
   Resources:
